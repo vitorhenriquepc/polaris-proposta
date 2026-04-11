@@ -610,7 +610,9 @@ function parseCPFL(text) {
 
 // -- UC LIST -------------------------------------------------------
 function addManualUC() {
-  document.getElementById('manualForm').classList.remove('hidden');
+  const mf = document.getElementById('manualForm');
+  mf.classList.remove('hidden');
+  setTimeout(() => mf.scrollIntoView({behavior:'smooth', block:'start'}), 100);
   const c=document.getElementById('consumoInputs');c.innerHTML='';
   const now=new Date();
   for(let i=0;i<12;i++){const d=new Date(now.getFullYear(),now.getMonth()-i,1);c.innerHTML+=`<div class="form-group"><label>${MESES[d.getMonth()]}/${d.getFullYear()%100}</label><input type="number" id="m_cons_${i}" placeholder="kWh"></div>`;}
@@ -741,7 +743,7 @@ function generateReport(){
   }
 
   document.getElementById('reportPreview').innerHTML=
-    `<div class="status info">\u1F4CB <strong>${ucs[0]?.nome}</strong> &#8226; ${ucs.length} UC(s) &#8226; CPFL Paulista</div>`+
+    `<div class="status info">&#128203; <strong>${ucs[0]?.nome}</strong> &#8226; ${ucs.length} UC(s) &#8226; CPFL Paulista</div>`+
     `<div class="highlights"><div class="highlight green-bg"><div class="highlight-label">Economia Mensal</div><div class="highlight-value">${fb(t.ecoMensal)}</div><div class="highlight-sub">por mês</div></div><div class="highlight gold-bg"><div class="highlight-label">Payback</div><div class="highlight-value">${t.payback.toFixed(1)} anos</div><div class="highlight-sub">retorno estimado</div></div><div class="highlight navy-bg"><div class="highlight-label">Economia 25 anos</div><div class="highlight-value">${fb(t.eco25)}</div><div class="highlight-sub">ROI ${t.roi.toFixed(0)}%</div></div></div>`+
     `<div class="summary-box"><div class="summary-row"><span class="summary-label">Potência Total</span><span class="summary-value">${f(t.kwp)} kWp</span></div><div class="summary-row"><span class="summary-label">Módulos</span><span class="summary-value">${totalMod} un. (${modMarca} ${modW}W)</span></div><div class="summary-row"><span class="summary-label">Geração Mensal</span><span class="summary-value">${fi(t.geracao)} kWh/mês</span></div><div class="summary-row"><span class="summary-label">Conta mínima c/ solar</span><span class="summary-value gold">${fb(t.contaMinima)}/mês</span></div><div class="summary-row"><span class="summary-label">Perda Fio B</span><span class="summary-value red">${fb(t.perdaFioB)}/mês</span></div></div>`+
     ucs.map((u,i)=>`<div class="uc-card"><div class="uc-num">UC ${i+1} - ${u.uc}</div><div class="uc-info">${u.nome}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px"><div class="text-xs">Módulos: <strong style="color:var(--white)">${u.modulos}</strong></div><div class="text-xs">Geração: <strong style="color:var(--white)">${fi(u.geracao)} kWh</strong></div><div class="text-xs">Economia: <strong style="color:#66BB6A">${fb(u.economiaMensal)}/mês</strong></div><div class="text-xs">Conta mín: <strong style="color:var(--gold)">${fb(u.contaMinima)}/mês</strong></div><div class="text-xs">Payback: <strong style="color:var(--gold)">${u.payback.toFixed(1)} anos</strong></div><div class="text-xs">Fio B: <strong style="color:var(--red)">${fb(u.perdaFioB)}/mês</strong></div></div></div>`).join('');
