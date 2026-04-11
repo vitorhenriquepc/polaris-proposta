@@ -500,11 +500,11 @@ function renderSuggestion() {
   const ucRows = sugs.map((sg,i) =>
     `<div style="background:rgba(0,0,0,0.15);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:12px">
       <span style="color:var(--gold);font-weight:600">UC ${i+1} - ${sg.ucNome}</span>
-      <span style="color:var(--gray);float:right">${sg.pan} módulos • ${sg.kwp.toFixed(2)} kWp • ${sg.inv}</span>
+      <span style="color:var(--gray);float:right">${sg.pan} módulos &#8226; ${sg.kwp.toFixed(2)} kWp &#8226; ${sg.inv}</span>
     </div>`).join('');
   document.getElementById('suggestionContent').innerHTML =
     `<div class="sug-grid">
-      <div class="sug-item"><div class="sug-label">Investimento</div><div class="sug-value gold">${fb(totalPreco)}</div><div class="sug-sub">${totalMod} módulos • ${totalKwp.toFixed(2)} kWp</div></div>
+      <div class="sug-item"><div class="sug-label">Investimento</div><div class="sug-value gold">${fb(totalPreco)}</div><div class="sug-sub">${totalMod} módulos &#8226; ${totalKwp.toFixed(2)} kWp</div></div>
       <div class="sug-item"><div class="sug-label">Economia/mês</div><div class="sug-value green">${fb(totalEco)}</div><div class="sug-sub">Payback ~${avgPay.toFixed(1)} anos</div></div>
     </div>
     ${ucRows}`;
@@ -548,16 +548,16 @@ async function handlePDFUpload(event) {
       const data = await readPDFFile(f);
       if (data) {
         ucs.push(data);
-        status.innerHTML += `<div class="status success">✅ UC ${data.uc} - ${data.nome} - Média: ${data.media.toFixed(0)} kWh</div>`;
+        status.innerHTML += `<div class="status success">&#x2705; UC ${data.uc} - ${data.nome} - Média: ${data.media.toFixed(0)} kWh</div>`;
       } else {
-        status.innerHTML += `<div class="status error">❌ Não foi possível ler: ${f.name}</div>`;
+        status.innerHTML += `<div class="status error">&#x274C; Não foi possível ler: ${f.name}</div>`;
       }
     } catch(e) {
-      status.innerHTML += `<div class="status error">❌ Erro: ${e.message}</div>`;
+      status.innerHTML += `<div class="status error">&#x274C; Erro: ${e.message}</div>`;
     }
   }
   btn.classList.remove('loading');
-  btn.innerHTML = '<span class="upload-icon">📎</span>Enviar mais PDFs<br><span class="text-xs" style="color:inherit;opacity:0.6">Aceita múltiplos arquivos</span>';
+  btn.innerHTML = '<span class="upload-icon">&#x1F4CE;</span>Enviar mais PDFs<br><span class="text-xs" style="color:inherit;opacity:0.6">Aceita múltiplos arquivos</span>';
   renderUCList();
   renderSuggestion();
   event.target.value='';
@@ -570,8 +570,7 @@ async function readPDFFile(file) {
   for (let i=1;i<=pdf.numPages;i++) {
     const pg=await pdf.getPage(i);
     const c=await pg.getTextContent();
-    text+=c.items.map(x=>x.str).join(' ')+'
-';
+    text+=c.items.map(x=>x.str).join(' ')+'\n';
   }
   return parseCPFL(text);
 }
@@ -636,7 +635,7 @@ function renderUCList(){
   c.innerHTML=ucs.map((uc,idx)=>{
     const mx=Math.max(...uc.historico.map(h=>h.kwh));
     const bars=uc.historico.slice(0,13).map(h=>`<div class="hbar${h.kwh===uc.maiorConsumo?' max':''}" style="height:${Math.max((h.kwh/mx)*100,5)}%" title="${h.mes}: ${h.kwh} kWh"></div>`).join('');
-    return `<div class="uc-card"><div class="uc-header"><div><div class="uc-num">UC ${idx+1} - ${uc.uc}</div><div class="uc-info">${uc.nome} • ${uc.classe}</div></div><button class="btn btn-red" onclick="removeUC(${idx})">✕</button></div><div class="uc-info">${uc.endereco}</div><div class="uc-consumption">Média: ${uc.media.toFixed(0)} kWh/mês</div><div class="uc-detail">Maior: ${uc.maiorConsumo} kWh (${uc.mesMaior}) • ${uc.tipo}</div><div class="history-bars">${bars}</div><div class="history-label"><span>${uc.historico[uc.historico.length-1]?.mes||''}</span><span>${uc.historico[0]?.mes||''}</span></div></div>`;
+    return `<div class="uc-card"><div class="uc-header"><div><div class="uc-num">UC ${idx+1} - ${uc.uc}</div><div class="uc-info">${uc.nome} &#8226; ${uc.classe}</div></div><button class="btn btn-red" onclick="removeUC(${idx})">\u2715</button></div><div class="uc-info">${uc.endereco}</div><div class="uc-consumption">Média: ${uc.media.toFixed(0)} kWh/mês</div><div class="uc-detail">Maior: ${uc.maiorConsumo} kWh (${uc.mesMaior}) &#8226; ${uc.tipo}</div><div class="history-bars">${bars}</div><div class="history-label"><span>${uc.historico[uc.historico.length-1]?.mes||''}</span><span>${uc.historico[0]?.mes||''}</span></div></div>`;
   }).join('');
 }
 function removeUC(i){ucs.splice(i,1);renderUCList();renderSuggestion();}
@@ -646,9 +645,9 @@ function buildInversorConfig(){
   const c=document.getElementById('inversorConfig');
   c.innerHTML=ucs.map((uc,idx)=>{
     const rows=(uc.inversores||[{marca:'Sungrow',kw:5,qtd:1}]).map((inv,iIdx)=>
-      `<div class="inv-row"><div class="form-group"><label>Marca</label><select onchange="updateInv(${idx},${iIdx},'marca',this.value)"><option${inv.marca==='Sungrow'?' selected':''}>Sungrow</option><option${inv.marca==='Solis'?' selected':''}>Solis</option><option${inv.marca==='Growatt'?' selected':''}>Growatt</option><option${inv.marca==='Deye'?' selected':''}>Deye</option><option${inv.marca==='Hoymiles'?' selected':''}>Hoymiles</option></select></div><div class="form-group"><label>kW</label><input type="number" value="${inv.kw}" onchange="updateInv(${idx},${iIdx},'kw',this.value)"></div><div class="form-group"><label>Qtd</label><input type="number" value="${inv.qtd}" min="1" onchange="updateInv(${idx},${iIdx},'qtd',this.value)"></div><button class="btn btn-red" onclick="removeInv(${idx},${iIdx})">✕</button></div>`
+      `<div class="inv-row"><div class="form-group"><label>Marca</label><select onchange="updateInv(${idx},${iIdx},'marca',this.value)"><option${inv.marca==='Sungrow'?' selected':''}>Sungrow</option><option${inv.marca==='Solis'?' selected':''}>Solis</option><option${inv.marca==='Growatt'?' selected':''}>Growatt</option><option${inv.marca==='Deye'?' selected':''}>Deye</option><option${inv.marca==='Hoymiles'?' selected':''}>Hoymiles</option></select></div><div class="form-group"><label>kW</label><input type="number" value="${inv.kw}" onchange="updateInv(${idx},${iIdx},'kw',this.value)"></div><div class="form-group"><label>Qtd</label><input type="number" value="${inv.qtd}" min="1" onchange="updateInv(${idx},${iIdx},'qtd',this.value)"></div><button class="btn btn-red" onclick="removeInv(${idx},${iIdx})">\u2715</button></div>`
     ).join('');
-    return `<div class="uc-card"><div class="uc-header"><div class="uc-num">UC ${idx+1} - ${uc.uc}</div></div><div class="uc-info" style="margin-bottom:10px">${uc.nome} • Média: ${uc.media.toFixed(0)} kWh</div><div class="form-group" style="margin-bottom:12px"><label>Nº de Módulos</label><input type="number" value="${uc.modulos||''}" placeholder="Ex: 9" onchange="ucs[${idx}].modulos=parseInt(this.value)||0"></div><label style="font-size:11px;color:var(--gray);margin-bottom:8px;display:block">Inversores:</label>${rows}<button class="btn-add" onclick="addInv(${idx})" style="padding:8px;font-size:11px">+ Inversor</button></div>`;
+    return `<div class="uc-card"><div class="uc-header"><div class="uc-num">UC ${idx+1} - ${uc.uc}</div></div><div class="uc-info" style="margin-bottom:10px">${uc.nome} &#8226; Média: ${uc.media.toFixed(0)} kWh</div><div class="form-group" style="margin-bottom:12px"><label>Nº de Módulos</label><input type="number" value="${uc.modulos||''}" placeholder="Ex: 9" onchange="ucs[${idx}].modulos=parseInt(this.value)||0"></div><label style="font-size:11px;color:var(--gray);margin-bottom:8px;display:block">Inversores:</label>${rows}<button class="btn-add" onclick="addInv(${idx})" style="padding:8px;font-size:11px">+ Inversor</button></div>`;
   }).join('');
 }
 function updateInv(u,i,f,v){if(f==='kw')v=parseFloat(v)||0;if(f==='qtd')v=parseInt(v)||1;ucs[u].inversores[i][f]=v;}
@@ -742,7 +741,7 @@ function generateReport(){
   }
 
   document.getElementById('reportPreview').innerHTML=
-    `<div class="status info">📋 <strong>${ucs[0]?.nome}</strong> • ${ucs.length} UC(s) • CPFL Paulista</div>`+
+    `<div class="status info">\u1F4CB <strong>${ucs[0]?.nome}</strong> &#8226; ${ucs.length} UC(s) &#8226; CPFL Paulista</div>`+
     `<div class="highlights"><div class="highlight green-bg"><div class="highlight-label">Economia Mensal</div><div class="highlight-value">${fb(t.ecoMensal)}</div><div class="highlight-sub">por mês</div></div><div class="highlight gold-bg"><div class="highlight-label">Payback</div><div class="highlight-value">${t.payback.toFixed(1)} anos</div><div class="highlight-sub">retorno estimado</div></div><div class="highlight navy-bg"><div class="highlight-label">Economia 25 anos</div><div class="highlight-value">${fb(t.eco25)}</div><div class="highlight-sub">ROI ${t.roi.toFixed(0)}%</div></div></div>`+
     `<div class="summary-box"><div class="summary-row"><span class="summary-label">Potência Total</span><span class="summary-value">${f(t.kwp)} kWp</span></div><div class="summary-row"><span class="summary-label">Módulos</span><span class="summary-value">${totalMod} un. (${modMarca} ${modW}W)</span></div><div class="summary-row"><span class="summary-label">Geração Mensal</span><span class="summary-value">${fi(t.geracao)} kWh/mês</span></div><div class="summary-row"><span class="summary-label">Conta mínima c/ solar</span><span class="summary-value gold">${fb(t.contaMinima)}/mês</span></div><div class="summary-row"><span class="summary-label">Perda Fio B</span><span class="summary-value red">${fb(t.perdaFioB)}/mês</span></div></div>`+
     ucs.map((u,i)=>`<div class="uc-card"><div class="uc-num">UC ${i+1} - ${u.uc}</div><div class="uc-info">${u.nome}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px"><div class="text-xs">Módulos: <strong style="color:var(--white)">${u.modulos}</strong></div><div class="text-xs">Geração: <strong style="color:var(--white)">${fi(u.geracao)} kWh</strong></div><div class="text-xs">Economia: <strong style="color:#66BB6A">${fb(u.economiaMensal)}/mês</strong></div><div class="text-xs">Conta mín: <strong style="color:var(--gold)">${fb(u.contaMinima)}/mês</strong></div><div class="text-xs">Payback: <strong style="color:var(--gold)">${u.payback.toFixed(1)} anos</strong></div><div class="text-xs">Fio B: <strong style="color:var(--red)">${fb(u.perdaFioB)}/mês</strong></div></div></div>`).join('');
@@ -793,7 +792,7 @@ function downloadPDF() {
     doc.setTextColor(...navy);doc.setFontSize(9);
     doc.text(uc.endereco||'Local '+(i+1),26,y+7);
     doc.setTextColor(...gray);doc.setFontSize(7);doc.setFont('helvetica','normal');
-    doc.text('UC: '+uc.uc+'  •  '+uc.classe+'  •  '+uc.tipo,26,y+12);
+    doc.text('UC: '+uc.uc+'  &#8226;  '+uc.classe+'  &#8226;  '+uc.tipo,26,y+12);
     doc.setFillColor(...white);doc.roundedRect(14,y+15,40,10,1,1,'F');
     doc.setTextColor(...gray);doc.setFontSize(5.5);doc.text('MÉDIA 12 MESES',16,y+18.5);
     doc.setTextColor(...navy);doc.setFontSize(9);doc.setFont('helvetica','bold');
@@ -916,7 +915,7 @@ function downloadPDF() {
   doc.setFillColor(...lbg);doc.roundedRect(10,y,W-20,8,1,1,'F');
   doc.setTextColor(...gray);doc.setFontSize(5.5);doc.text('PREMISSAS',14,y+3.5);
   doc.setTextColor(50,50,50);doc.setFontSize(7);
-  doc.text('Tarifa: R$ '+f(d.tarifa)+'/kWh  •  CPFL Paulista  •  Degradação: 0,5%/ano  •  Invest: '+fb(d.investimento),14,y+7);
+  doc.text('Tarifa: R$ '+f(d.tarifa)+'/kWh  &#8226;  CPFL Paulista  &#8226;  Degradação: 0,5%/ano  &#8226;  Invest: '+fb(d.investimento),14,y+7);
   y+=12;
   const fc=[10,48,82,118,152,176,W-10],fh=['LOCAL','ECON./MÊS','ECON./ANO','INVESTIMENTO','PAYBACK','ROI 25'];
   doc.setFillColor(...navy);doc.roundedRect(10,y,W-20,7,1,1,'F');
@@ -1028,8 +1027,6 @@ function downloadPDF() {
   const cn=d.ucs[0]?.nome?.replace(/[^a-zA-Z0-9]/g,'_')||'Cliente';
   doc.save('Proposta_Polaris_'+cn+'.pdf');
 }
-
-pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 </script>
