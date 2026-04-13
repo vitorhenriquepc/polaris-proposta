@@ -37,6 +37,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .step.done .step-num{background:linear-gradient(135deg,var(--green),#66BB6A);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .step-label{font-size:10px;color:rgba(255,255,255,0.4);margin-top:3px;font-weight:500}
 .step.active .step-label{color:rgba(255,255,255,0.8)}
+
+input[readonly]{background:rgba(245,166,35,0.06)!important;border-color:rgba(245,166,35,0.3)!important;color:var(--gold)!important;cursor:default}
 .card{background:var(--card-bg);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.05);border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:0 4px 24px rgba(0,0,0,0.15)}
 .card-title{font-family:'Sora',sans-serif;font-size:14px;font-weight:700;color:var(--white);margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .card-title .icon{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
@@ -304,7 +306,9 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;hei
       <div class="form-grid">
         <div class="form-group"><label>Potência Módulos (W)</label><input id="s_modW" type="number" value="620"></div>
         <div class="form-group"><label>Marca dos Módulos</label><input id="s_modMarca" value="Romna Solar"></div>
-        <div class="form-group"><label>Investimento Total (R$)</label><input id="s_investimento" type="number" placeholder="Calculado automaticamente"></div>
+        <div class="form-group"><label>Tipo de Estrutura</label><select id="s_estrutura" onchange="calcularInvestimento()"><option value="colonial">Colonial (R$ 80/mod)</option><option value="fibrocimento">Fibrocimento (R$ 75/mod)</option><option value="metalica">Metalica (R$ 25/mod)</option><option value="solo">Solo (R$ 183/mod)</option><option value="laje">Laje (R$ 143/mod)</option></select></div>
+        <div class="form-group"><label>Distancia (km)</label><input id="s_km" type="number" value="0" min="0" step="1" oninput="calcularInvestimento()" placeholder="Ex: 15"></div>
+        <div class="form-group"><label>Investimento Total (R$)</label><input id="s_investimento" type="number" placeholder="Calculado automaticamente" readonly style="background:rgba(245,166,35,0.08)"></div>
         <div class="form-group"><label>Tarifa (R$/kWh)</label><input id="s_tarifa" type="number" step="0.01" value="0.89"></div>
         <div class="form-group"><label>HSP (h/dia)</label><input id="s_hsp" type="number" step="0.1" value="5.20"></div>
         <div class="form-group"><label>TUSD Fio B (R$/kWh)</label><input id="s_fiob" type="number" step="0.001" value="0.196"></div>
@@ -468,6 +472,98 @@ function updateACTotal() {
 function getACExtra() { return acBtu ? AC_KWH[acBtu] * acQtd : 0; }
 
 // -- SUGESTÃO ------------------------------------------------------
+function calcularInvestimento() {
+  // ============================================================
+  // REPLICA EXATA DA PLANILHA POLARIS -- TABELA DE PRECOS
+  // ============================================================
+
+  // Kit sem estrutura por quantidade de modulos (coluna H)
+  const KITS_SEM = {
+    4:3907.14, 5:4361.57, 6:4869.19, 7:5376.81,
+    8:6189.69, 9:6816.50, 10:7324.12, 11:7831.74,
+    12:8339.36, 13:8939.55, 14:9473.53, 15:11041.56,
+    16:11575.54, 17:12109.53, 18:12643.52, 19:13177.50,
+    20:14194.96, 21:14728.94, 22:15262.93, 23:15796.91,
+    24:16330.90, 25:17345.11, 26:17879.09, 27:18413.07,
+    28:18947.06, 29:21549.14, 30:22083.12, 31:22617.11,
+    32:23151.10, 33:23685.08, 34:24219.06
+  };
+
+  // Custo por modulo do tipo de estrutura ($M$9)
+  const ESTRUTURA_MOD = {
+    'colonial':80.0, 'fibrocimento':75.0, 'metalica':25.0,
+    'solo':183.07, 'laje':143.65
+  };
+
+  // Material CA por faixa de modulos (Q6:Q9)
+  function matCA(pan) {
+    if (pan <= 10) return 694.03;
+    if (pan <= 25) return 819.45;
+    if (pan <= 50) return 2705.40;
+    return 5698.62;
+  }
+
+  // Fator de deslocamento: SE(ARRED(pan/10;0)=0; 1; TETO(pan/16;1))
+  function fatorKm(pan) {
+    return Math.round(pan / 10) === 0 ? 1 : Math.ceil(pan / 16);
+  }
+
+  // Markup (celulas W4:W8)
+  const W4 = 0.10;   // Impostos sobre servico
+  const W5 = 0.00;   // Seguro
+  const W6 = 0.05;   // Comissao
+  const W7 = 0.1314; // Despesas Administrativas
+  const W8 = 0.1186; // Lucro Operacional
+  const B = 1 - (W5 + W6 + W7 + W8); // 0.70
+  const C = 1 - (W4 + W5 + W6 + W7 + W8); // 0.60
+
+  // Pegar parametros do Step 2
+  const totalMod = ucs.reduce((s, u) => s + (u.modulos || 0), 0);
+  if (!totalMod) return;
+
+  const tipoEst = (document.getElementById('s_estrutura')?.value || 'colonial').toLowerCase();
+  const km = parseFloat(document.getElementById('s_km')?.value) || 0;
+
+  const kitSem = KITS_SEM[totalMod];
+  if (!kitSem) {
+    document.getElementById('s_investimento').value = '';
+    return;
+  }
+
+  // AD3: kit com estrutura (coluna J = H + I)
+  // I = $M$9 * pan + Q11, onde Q11 = 4,79 * 2 * pan * 3 = 28,74 * pan
+  const q11 = Math.round(4.79 * 2 * totalMod * 3 * 100) / 100;
+  const AD3 = Math.round((kitSem + totalMod * (ESTRUTURA_MOD[tipoEst] || 80) + q11) * 100) / 100;
+
+  // AD4: mao de obra = pan * R$100
+  const AD4 = Math.round(100 * totalMod * 100) / 100;
+
+  // AD5: deslocamento = ARRED(fator * km * 1,60 * 2; 2)
+  const AD5 = Math.round(fatorKm(totalMod) * km * 1.60 * 2 * 100) / 100;
+
+  // AD6: material CA
+  const AD6 = matCA(totalMod);
+
+  // AD7: homologacao e pos venda
+  const AD7 = 360.00;
+
+  // AD8: custo total = SOMA(AD3:AD7)
+  const AD8 = Math.round((AD3 + AD4 + AD5 + AD6 + AD7) * 100) / 100;
+
+  // AD10 (VENDA): formula exata da planilha
+  // =ARRED(AD3/B + ((AD3/B - AD3)*W4)/C + SOMA(AD4:AD7)/B + (SOMA(AD4:AD7)/B*W4)/C; 2)
+  const somaAD4_AD7 = AD4 + AD5 + AD6 + AD7;
+  const parte1 = AD3 / B;
+  const parte2 = ((AD3 / B) - AD3) * W4 / C;
+  const parte3 = somaAD4_AD7 / B;
+  const parte4 = (somaAD4_AD7 / B * W4) / C;
+  const venda = Math.round((parte1 + parte2 + parte3 + parte4) * 100) / 100;
+
+  document.getElementById('s_investimento').value = Math.round(venda);
+  updateDesconto(document.getElementById('descontoSlider')?.value || 0);
+}
+
+
 function buscarKit(paineis) {
   return TABELA.find(t => t.pan >= paineis) || TABELA[TABELA.length-1];
 }
@@ -523,6 +619,7 @@ function usarSugestao() {
 // -- NAVEGAÇÃO ----------------------------------------------------
 function goStep(n) {
   if (n===2 && !ucs.length) { alert('Adicione pelo menos uma UC'); return; }
+  if (n===2) setTimeout(calcularInvestimento, 100);
   if (n===3) generateReport();
   currentStep = n;
   ['step1','step2','step3'].forEach((id,i) => document.getElementById(id).classList.toggle('hidden', i+1!==n));
@@ -649,7 +746,7 @@ function buildInversorConfig(){
     const rows=(uc.inversores||[{marca:'Sungrow',kw:5,qtd:1}]).map((inv,iIdx)=>
       `<div class="inv-row"><div class="form-group"><label>Marca</label><select onchange="updateInv(${idx},${iIdx},'marca',this.value)"><option${inv.marca==='Sungrow'?' selected':''}>Sungrow</option><option${inv.marca==='Solis'?' selected':''}>Solis</option><option${inv.marca==='Growatt'?' selected':''}>Growatt</option><option${inv.marca==='Deye'?' selected':''}>Deye</option><option${inv.marca==='Hoymiles'?' selected':''}>Hoymiles</option></select></div><div class="form-group"><label>kW</label><input type="number" value="${inv.kw}" onchange="updateInv(${idx},${iIdx},'kw',this.value)"></div><div class="form-group"><label>Qtd</label><input type="number" value="${inv.qtd}" min="1" onchange="updateInv(${idx},${iIdx},'qtd',this.value)"></div><button class="btn btn-red" onclick="removeInv(${idx},${iIdx})">\u2715</button></div>`
     ).join('');
-    return `<div class="uc-card"><div class="uc-header"><div class="uc-num">UC ${idx+1} - ${uc.uc}</div></div><div class="uc-info" style="margin-bottom:10px">${uc.nome} &#8226; Média: ${uc.media.toFixed(0)} kWh</div><div class="form-group" style="margin-bottom:12px"><label>Nº de Módulos</label><input type="number" value="${uc.modulos||''}" placeholder="Ex: 9" onchange="ucs[${idx}].modulos=parseInt(this.value)||0"></div><label style="font-size:11px;color:var(--gray);margin-bottom:8px;display:block">Inversores:</label>${rows}<button class="btn-add" onclick="addInv(${idx})" style="padding:8px;font-size:11px">+ Inversor</button></div>`;
+    return `<div class="uc-card"><div class="uc-header"><div class="uc-num">UC ${idx+1} - ${uc.uc}</div></div><div class="uc-info" style="margin-bottom:10px">${uc.nome} &#8226; Média: ${uc.media.toFixed(0)} kWh</div><div class="form-group" style="margin-bottom:12px"><label>Nº de Módulos</label><input type="number" value="${uc.modulos||''}" placeholder="Ex: 9" onchange="ucs[${idx}].modulos=parseInt(this.value)||0;calcularInvestimento()"></div><label style="font-size:11px;color:var(--gray);margin-bottom:8px;display:block">Inversores:</label>${rows}<button class="btn-add" onclick="addInv(${idx})" style="padding:8px;font-size:11px">+ Inversor</button></div>`;
   }).join('');
 }
 function updateInv(u,i,f,v){if(f==='kw')v=parseFloat(v)||0;if(f==='qtd')v=parseInt(v)||1;ucs[u].inversores[i][f]=v;}
@@ -680,6 +777,8 @@ function generateReport(){
   const inv=parseFloat(document.getElementById('s_investimento')?.value)||0;
   const modW=parseInt(document.getElementById('s_modW')?.value)||620;
   const modMarca=document.getElementById('s_modMarca')?.value||'Romna Solar';
+  const estruturaNome=document.getElementById('s_estrutura')?.options[document.getElementById('s_estrutura')?.selectedIndex]?.text||'Colonial';
+  const kmDist=parseFloat(document.getElementById('s_km')?.value)||0;
   const cip=parseFloat(document.getElementById('s_cip')?.value)||36.37;
   const descPct=parseFloat(document.getElementById('s_desconto')?.value)||0;
   const pr=PR, deg=0.005, fiobP=0.60;
@@ -745,7 +844,9 @@ function generateReport(){
   document.getElementById('reportPreview').innerHTML=
     `<div class="status info">&#128203; <strong>${ucs[0]?.nome}</strong> &#8226; ${ucs.length} UC(s) &#8226; CPFL Paulista</div>`+
     `<div class="highlights"><div class="highlight green-bg"><div class="highlight-label">Economia Mensal</div><div class="highlight-value">${fb(t.ecoMensal)}</div><div class="highlight-sub">por mês</div></div><div class="highlight gold-bg"><div class="highlight-label">Payback</div><div class="highlight-value">${t.payback.toFixed(1)} anos</div><div class="highlight-sub">retorno estimado</div></div><div class="highlight navy-bg"><div class="highlight-label">Economia 25 anos</div><div class="highlight-value">${fb(t.eco25)}</div><div class="highlight-sub">ROI ${t.roi.toFixed(0)}%</div></div></div>`+
-    `<div class="summary-box"><div class="summary-row"><span class="summary-label">Potência Total</span><span class="summary-value">${f(t.kwp)} kWp</span></div><div class="summary-row"><span class="summary-label">Módulos</span><span class="summary-value">${totalMod} un. (${modMarca} ${modW}W)</span></div><div class="summary-row"><span class="summary-label">Geração Mensal</span><span class="summary-value">${fi(t.geracao)} kWh/mês</span></div><div class="summary-row"><span class="summary-label">Conta mínima c/ solar</span><span class="summary-value gold">${fb(t.contaMinima)}/mês</span></div><div class="summary-row"><span class="summary-label">Perda Fio B</span><span class="summary-value red">${fb(t.perdaFioB)}/mês</span></div></div>`+
+    `<div class="summary-box"><div class="summary-row"><span class="summary-label">Potência Total</span><span class="summary-value">${f(t.kwp)} kWp</span></div><div class="summary-row"><span class="summary-label">Estrutura</span><span class="summary-value">${estruturaNome}</span></div>\` +
+    \`<div class="summary-row"><span class="summary-label">Deslocamento</span><span class="summary-value">${kmDist > 0 ? kmDist + ' km' : 'Local'}</span></div>\` +
+    \`<div class="summary-row"><span class="summary-label">Módulos</span><span class="summary-value">${totalMod} un. (${modMarca} ${modW}W)</span></div><div class="summary-row"><span class="summary-label">Geração Mensal</span><span class="summary-value">${fi(t.geracao)} kWh/mês</span></div><div class="summary-row"><span class="summary-label">Conta mínima c/ solar</span><span class="summary-value gold">${fb(t.contaMinima)}/mês</span></div><div class="summary-row"><span class="summary-label">Perda Fio B</span><span class="summary-value red">${fb(t.perdaFioB)}/mês</span></div></div>`+
     ucs.map((u,i)=>`<div class="uc-card"><div class="uc-num">UC ${i+1} - ${u.uc}</div><div class="uc-info">${u.nome}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px"><div class="text-xs">Módulos: <strong style="color:var(--white)">${u.modulos}</strong></div><div class="text-xs">Geração: <strong style="color:var(--white)">${fi(u.geracao)} kWh</strong></div><div class="text-xs">Economia: <strong style="color:#66BB6A">${fb(u.economiaMensal)}/mês</strong></div><div class="text-xs">Conta mín: <strong style="color:var(--gold)">${fb(u.contaMinima)}/mês</strong></div><div class="text-xs">Payback: <strong style="color:var(--gold)">${u.payback.toFixed(1)} anos</strong></div><div class="text-xs">Fio B: <strong style="color:var(--red)">${fb(u.perdaFioB)}/mês</strong></div></div></div>`).join('');
 }
 
