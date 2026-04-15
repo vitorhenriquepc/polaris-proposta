@@ -580,6 +580,32 @@ function calcularInvestimento() {
 function buscarKit(paineis) {
   return TABELA.find(t => t.pan >= paineis) || TABELA[TABELA.length-1];
 }
+function calcularPrecoAD10(pan) {
+  // Replica exata da formula AD10 da planilha Polaris
+  const KITS_SEM = {
+    4:3907.14,5:4361.57,6:4869.19,7:5376.81,
+    8:6189.69,9:6816.50,10:7324.12,11:7831.74,
+    12:8339.36,13:8939.55,14:9473.53,15:11041.56,
+    16:11575.54,17:12109.53,18:12643.52,19:13177.50,
+    20:14194.96,21:14728.94,22:15262.93,23:15796.91,
+    24:16330.90,25:17345.11,26:17879.09,27:18413.07,
+    28:18947.06,29:21549.14,30:22083.12,31:22617.11,
+    32:23151.10,33:23685.08,34:24219.06
+  };
+  const kitSem = KITS_SEM[pan];
+  if (!kitSem) return 0;
+  // Colonial padrao (sugestao usa estrutura Colonial)
+  const q11 = Math.round(4.79*2*pan*3*100)/100;
+  const AD3 = Math.round((kitSem + pan*80 + q11)*100)/100;
+  const AD4 = pan*100;
+  const AD6 = pan<=10?694.03:pan<=25?819.45:pan<=50?2705.40:5698.62;
+  const AD7 = 360;
+  const soma = AD4 + AD6 + AD7; // AD5=0 (sem km na sugestao)
+  const B=0.70, C=0.60, W4=0.10;
+  const p1=AD3/B, p2=((AD3/B)-AD3)*W4/C, p3=soma/B, p4=(soma/B*W4)/C;
+  return Math.round((p1+p2+p3+p4)*100)/100;
+}
+
 function calcSugestoes() {
   const hsp = getHSP();
   const acExtra = getACExtra();
@@ -589,7 +615,7 @@ function calcSugestoes() {
     const kwpMin = consumo / (hsp * 30 * PR);
     const panMin = Math.ceil(kwpMin * 1000 / 620);
     const kit = buscarKit(panMin);
-    const preco = kit.custo / MARKUP_DIV;
+    const preco = calcularPrecoAD10(panMin);
     const geracao = kit.kwp * hsp * 30 * PR;
     const tarifa = parseFloat(document.getElementById('s_tarifa')?.value || 0.89);
     const economia = consumo * tarifa;
@@ -877,7 +903,7 @@ function downloadPDF() {
   function hdr(doc,sub){
     doc.setFillColor(...navy);doc.rect(0,0,W,28,'F');
     doc.setFillColor(...gold);doc.rect(0,28,W,1,'F');
-    try{ doc.addImage(LOGO_B64,'PNG',10,5,50,18); }catch(e){}
+    try{ doc.addImage(LOGO_B64,'PNG',10,7,87.5,14); }catch(e){}
     doc.setTextColor(...white);doc.setFontSize(10);doc.setFont('helvetica','normal');
     doc.text(sub||'',W-12,12,{align:'right'});
     doc.setFontSize(7);doc.text('CPFL Paulista',W-12,18,{align:'right'});
